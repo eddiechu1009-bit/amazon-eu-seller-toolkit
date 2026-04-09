@@ -24,16 +24,16 @@ export default function ModuleView({ module, checked, onToggle }: Props) {
       </div>
 
       {/* Module progress */}
-      <div className="mb-6 bg-white rounded-xl p-4 shadow-sm">
+      <div className="mb-6 bg-white rounded-xl p-4 shadow-sm animate-fadeIn">
         <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-medium text-gray-700">模組進度</span>
+          <span className="text-sm font-semibold text-gray-700">模組進度</span>
           <span className="text-sm text-gray-500">
             {doneCount}/{totalCount} 項完成 ({progress}%)
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-3">
           <div
-            className="bg-amazon-orange h-3 rounded-full transition-all duration-500"
+            className="bg-gradient-to-r from-amazon-orange to-yellow-400 h-3 rounded-full transition-all duration-700 ease-out"
             style={{ width: `${progress}%` }}
             role="progressbar"
             aria-valuenow={progress}
@@ -41,6 +41,11 @@ export default function ModuleView({ module, checked, onToggle }: Props) {
             aria-valuemax={100}
           />
         </div>
+        {progress === 100 && (
+          <p className="text-sm text-green-600 font-semibold mt-2 text-center animate-fadeInScale">
+            🎉 此模組已全部完成！
+          </p>
+        )}
       </div>
 
       {/* Task cards */}

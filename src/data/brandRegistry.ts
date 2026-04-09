@@ -66,7 +66,7 @@ export const brandRegistryModule: Module = {
       tips: [
         '🎨 A+ Content（A+ 頁面）：用圖文模組取代純文字描述，提升轉換率 3-10%',
         '🏪 Brand Store（品牌旗艦店）：建立專屬品牌頁面，可作為廣告落地頁',
-        '🌟 Amazon Vine：免費送樣換取早期評價，新品最重要的工具之一',
+        '🌟 Amazon Vine：送樣換取早期評價（1-2 件免費，3-30 件收 $75-200 USD/ASIN）',
         '📊 Brand Analytics：查看搜尋詞排名、市場籃子分析、人口統計等數據',
         '📢 Sponsored Brands：品牌標題廣告和影片廣告（需 Brand Registry）',
         '🔒 Transparency：逐件追蹤防偽標籤',

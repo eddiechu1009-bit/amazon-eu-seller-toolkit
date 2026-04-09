@@ -48,27 +48,46 @@ export default function App() {
   if (!started) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amazon-dark to-amazon-light p-4">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-8 text-center">
-          <div className="text-5xl mb-4">🛠️</div>
+        <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full p-8 text-center animate-fadeInScale">
+          <div className="text-5xl mb-3 animate-bounce">🛠️</div>
           <h1 className="text-3xl font-bold text-amazon-dark mb-2">Amazon 歐洲賣家營運工具箱</h1>
           <p className="text-gray-500 mb-6">註冊完成後的六大必修課，從品牌註冊到廣告投放一站搞定</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8 text-left">
-            {allModules.map((mod) => (
-              <div key={mod.id} className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                <div className="text-2xl mb-1">{mod.icon}</div>
-                <div className="text-sm font-semibold text-gray-800">{mod.title}</div>
-                <div className="text-xs text-gray-400 mt-0.5">{mod.items.length} 個項目</div>
-              </div>
-            ))}
+            {allModules.map((mod) => {
+              const done = completedCounts[mod.id] || 0;
+              const total = mod.items.length;
+              return (
+                <button
+                  key={mod.id}
+                  onClick={() => { setActiveTab(mod.id as ModuleId); setStarted(true); }}
+                  className="bg-gray-50 rounded-xl p-4 border border-gray-100 text-left
+                    hover:border-amazon-orange hover:shadow-lg hover:-translate-y-1
+                    transition-all duration-200 group cursor-pointer"
+                >
+                  <div className="text-2xl mb-1.5 group-hover:scale-110 transition-transform duration-200">{mod.icon}</div>
+                  <div className="text-sm font-semibold text-gray-800 group-hover:text-amazon-orange transition-colors">{mod.title}</div>
+                  <div className="text-xs text-gray-400 mt-0.5">{total} 個項目</div>
+                  {done > 0 && (
+                    <div className="mt-2">
+                      <div className="w-full bg-gray-200 rounded-full h-1.5">
+                        <div className="bg-gradient-to-r from-amazon-orange to-yellow-400 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{done}/{total} 完成</div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <button
             onClick={() => setStarted(true)}
             className="px-8 py-3 bg-amazon-orange text-white font-semibold rounded-lg
-              hover:bg-orange-500 transition text-lg"
+              hover:bg-orange-500 hover:shadow-lg hover:-translate-y-0.5
+              transition-all duration-200 text-lg"
           >
-            開始使用 →
+            從頭開始 →
           </button>
 
           <p className="text-xs text-gray-400 mt-6">
@@ -85,8 +104,11 @@ export default function App() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-amazon-dark text-white px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-lg">
         <div className="flex items-center gap-3">
-          <span className="text-xl">🛠️</span>
-          <h1 className="text-lg font-semibold">Amazon 歐洲賣家營運工具箱</h1>
+          <span className="text-2xl">🛠️</span>
+          <div>
+            <h1 className="text-lg font-semibold">Amazon 歐洲賣家營運工具箱</h1>
+            <p className="text-xs text-gray-400">品牌註冊 · Listing · FBA · PPC · 促銷</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -118,7 +140,7 @@ export default function App() {
         totalCounts={totalCounts}
       />
 
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <ProgressTracker checked={checked} />
         <ModuleView module={currentModule} checked={checked} onToggle={toggleCheck} />
       </main>

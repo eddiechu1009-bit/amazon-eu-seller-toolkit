@@ -22,15 +22,15 @@ export default function TaskCard({ item, checked, onToggle }: Props) {
 
   return (
     <div
-      className={`bg-white rounded-xl border-2 transition shadow-sm ${
-        checked ? 'border-green-300 bg-green-50/30' : 'border-gray-100 hover:border-gray-200'
+      className={`bg-white rounded-xl border-2 transition-all duration-200 shadow-sm animate-fadeIn ${
+        checked ? 'border-green-300 bg-green-50/30' : 'border-gray-100 hover:border-gray-200 hover:shadow-md'
       }`}
     >
       <div className="flex items-start gap-3 p-4">
         <button
           onClick={onToggle}
-          className={`mt-0.5 w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition ${
-            checked ? 'bg-green-500 border-green-500 text-white' : 'border-gray-300 hover:border-amazon-orange'
+          className={`mt-0.5 w-6 h-6 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
+            checked ? 'bg-green-500 border-green-500 text-white animate-checkPop' : 'border-gray-300 hover:border-amazon-orange hover:scale-110'
           }`}
           aria-label={checked ? '標記為未完成' : '標記為已完成'}
         >
@@ -82,15 +82,15 @@ export default function TaskCard({ item, checked, onToggle }: Props) {
 
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-gray-400 hover:text-gray-600 p-1 flex-shrink-0"
+          className="text-gray-400 hover:text-amazon-orange p-1.5 flex-shrink-0 rounded-lg hover:bg-orange-50 transition-all duration-200"
           aria-label={expanded ? '收合詳情' : '展開詳情'}
         >
-          <span className={`inline-block transition-transform ${expanded ? 'rotate-180' : ''}`}>▼</span>
+          <span className={`inline-block transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>▼</span>
         </button>
       </div>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-0 ml-9 border-t border-gray-100 mt-0">
+        <div className="px-4 pb-4 pt-0 ml-9 border-t border-gray-100 mt-0 animate-fadeIn">
           <div className="pt-3 space-y-3">
             {item.documents && item.documents.length > 0 && (
               <div>
