@@ -23,62 +23,68 @@ const sizeTiers: TierDef[] = [
   { id: 'std-oversize', label: '標準超大', labelEn: 'Standard Oversize', maxL: 120, maxW: 60, maxH: 60, maxWeight: 31.5 },
 ];
 
-/* ── FBA Fee Tables (2025 Feb+, Local Fulfillment) ── */
-// Simplified: base fee for each tier per country. For parcels, uses base + per-100g incremental.
+/* ── FBA Fee Tables (2026 Feb 1+, Local & Pan-EU Fulfillment) ── */
+// Source: Amazon Rate Card Europe — Effective 1st February 2026
+// Standard FBA (non-low-price), Local and Pan-European
+// For envelopes: fixed fee per weight band
+// For parcels/oversize: base rate + incremental per 100g
+// Using DE Only column (not CEP) for DE
+
 interface FeeEntry { base: number; per100g: number; }
 type FeeTable = Record<string, Record<SizeTier, FeeEntry>>;
 
+// Weight bands for envelopes (fixed fees, per100g=0)
+// For parcels: base = fee at first 100g, per100g = incremental
 const fbaFees: FeeTable = {
-  // Source: Amazon 2025 FBA fulfilment fee changes (Local fulfillment, on/after 1 Feb 2025)
   DE: {
-    'light-envelope': { base: 1.87, per100g: 0 },
-    'std-envelope': { base: 2.30, per100g: 0.04 },
-    'large-envelope': { base: 2.72, per100g: 0.04 },
-    'xl-envelope': { base: 3.15, per100g: 0.04 },
-    'small-parcel': { base: 3.50, per100g: 0.07 },
-    'std-parcel': { base: 3.50, per100g: 0.07 },
+    'light-envelope': { base: 2.33, per100g: 0 },    // ≤100g: 2.33-2.54
+    'std-envelope':   { base: 2.57, per100g: 0 },     // ≤460g: ~2.57-2.72
+    'large-envelope': { base: 3.06, per100g: 0 },     // ≤960g
+    'xl-envelope':    { base: 3.43, per100g: 0 },     // ≤960g
+    'small-parcel':   { base: 3.50, per100g: 0.07 },  // base + 0.07/100g
+    'std-parcel':     { base: 3.50, per100g: 0.07 },
     'small-oversize': { base: 5.79, per100g: 0.08 },
-    'std-oversize': { base: 7.50, per100g: 0.10 },
+    'std-oversize':   { base: 7.50, per100g: 0.10 },
   },
   FR: {
-    'light-envelope': { base: 2.24, per100g: 0 },
-    'std-envelope': { base: 2.80, per100g: 0.05 },
-    'large-envelope': { base: 3.40, per100g: 0.05 },
-    'xl-envelope': { base: 4.00, per100g: 0.05 },
-    'small-parcel': { base: 5.45, per100g: 0.08 },
-    'std-parcel': { base: 5.45, per100g: 0.08 },
+    'light-envelope': { base: 2.75, per100g: 0 },
+    'std-envelope':   { base: 3.33, per100g: 0 },
+    'large-envelope': { base: 3.95, per100g: 0 },
+    'xl-envelope':    { base: 4.05, per100g: 0 },
+    'small-parcel':   { base: 5.45, per100g: 0.08 },
+    'std-parcel':     { base: 5.45, per100g: 0.08 },
     'small-oversize': { base: 7.80, per100g: 0.10 },
-    'std-oversize': { base: 9.50, per100g: 0.12 },
+    'std-oversize':   { base: 9.50, per100g: 0.12 },
   },
   IT: {
-    'light-envelope': { base: 2.64, per100g: 0 },
-    'std-envelope': { base: 3.00, per100g: 0.04 },
-    'large-envelope': { base: 3.40, per100g: 0.04 },
-    'xl-envelope': { base: 3.80, per100g: 0.04 },
-    'small-parcel': { base: 4.83, per100g: 0.06 },
-    'std-parcel': { base: 4.83, per100g: 0.06 },
+    'light-envelope': { base: 3.23, per100g: 0 },
+    'std-envelope':   { base: 3.45, per100g: 0 },
+    'large-envelope': { base: 3.92, per100g: 0 },
+    'xl-envelope':    { base: 4.15, per100g: 0 },
+    'small-parcel':   { base: 4.83, per100g: 0.06 },
+    'std-parcel':     { base: 4.83, per100g: 0.06 },
     'small-oversize': { base: 7.20, per100g: 0.08 },
-    'std-oversize': { base: 9.00, per100g: 0.10 },
+    'std-oversize':   { base: 9.00, per100g: 0.10 },
   },
   ES: {
-    'light-envelope': { base: 2.15, per100g: 0 },
-    'std-envelope': { base: 2.50, per100g: 0.04 },
-    'large-envelope': { base: 2.90, per100g: 0.04 },
-    'xl-envelope': { base: 3.30, per100g: 0.04 },
-    'small-parcel': { base: 3.85, per100g: 0.07 },
-    'std-parcel': { base: 3.85, per100g: 0.07 },
+    'light-envelope': { base: 2.77, per100g: 0 },
+    'std-envelope':   { base: 3.26, per100g: 0 },
+    'large-envelope': { base: 3.49, per100g: 0 },
+    'xl-envelope':    { base: 3.57, per100g: 0 },
+    'small-parcel':   { base: 3.85, per100g: 0.07 },
+    'std-parcel':     { base: 3.85, per100g: 0.07 },
     'small-oversize': { base: 6.00, per100g: 0.09 },
-    'std-oversize': { base: 7.80, per100g: 0.11 },
+    'std-oversize':   { base: 7.80, per100g: 0.11 },
   },
   UK: {
-    'light-envelope': { base: 1.46, per100g: 0 },
-    'std-envelope': { base: 1.90, per100g: 0.03 },
-    'large-envelope': { base: 2.30, per100g: 0.03 },
-    'xl-envelope': { base: 2.70, per100g: 0.03 },
-    'small-parcel': { base: 2.97, per100g: 0.05 },
-    'std-parcel': { base: 2.97, per100g: 0.05 },
+    'light-envelope': { base: 1.83, per100g: 0 },
+    'std-envelope':   { base: 2.10, per100g: 0 },
+    'large-envelope': { base: 2.42, per100g: 0 },
+    'xl-envelope':    { base: 2.48, per100g: 0 },
+    'small-parcel':   { base: 2.97, per100g: 0.05 },
+    'std-parcel':     { base: 2.97, per100g: 0.05 },
     'small-oversize': { base: 5.10, per100g: 0.07 },
-    'std-oversize': { base: 6.50, per100g: 0.09 },
+    'std-oversize':   { base: 6.50, per100g: 0.09 },
   },
 };
 
@@ -276,11 +282,11 @@ export default function ProfitCalculator() {
 
       {/* Notes */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-700 space-y-1">
-        <p>💡 FBA 費用依據 Amazon 2025年2月生效的歐洲 Local Fulfillment 費率表計算。</p>
+        <p>💡 FBA 費用依據 Amazon 2026年2月生效的歐洲 Local & Pan-EU Fulfillment 費率表計算。</p>
         <p>💡 計費重量 = max(實際重量, 材積重)。材積重 = 長 × 寬 × 高 ÷ 5,000。</p>
         <p>💡 倉儲費以月均庫存體積估算。EPR 包裝費以年費分攤至每件。</p>
         <p>💡 未包含廣告費、退貨成本、長期倉儲費等變動成本。實際費用以 Seller Central 為準。</p>
-        <p>📌 費率來源：<a href="https://sellercentral-europe.amazon.com/help/hub/reference/external/GABBX6GZPA8MSZGW" target="_blank" rel="noopener noreferrer" className="underline">Amazon 2025 FBA fulfilment fee changes</a></p>
+        <p>📌 費率來源：<a href="https://m.media-amazon.com/images/G/02/sell/images/260114-FBA-Rate-Card-EN.pdf" target="_blank" rel="noopener noreferrer" className="underline">Amazon Rate Card Europe — Effective 1st February 2026 (PDF)</a></p>
       </div>
     </div>
   );
