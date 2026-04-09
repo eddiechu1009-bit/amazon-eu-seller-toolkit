@@ -85,6 +85,24 @@ export default function App() {
             })}
           </div>
 
+          {/* Profit Calculator Entry */}
+          <div className="mb-6">
+            <button
+              onClick={() => { setAppMode('profit'); setStarted(true); }}
+              className="w-full bg-gradient-to-r from-amazon-blue to-blue-600 text-white rounded-xl p-4
+                hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 text-left group"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-3xl group-hover:scale-110 transition-transform duration-200">💰</span>
+                <div>
+                  <div className="text-base font-semibold">多國利潤比較器</div>
+                  <div className="text-sm text-white/70">輸入產品尺寸重量，一次比較 DE/FR/IT/ES/UK 五國利潤</div>
+                </div>
+                <span className="ml-auto text-white/50 group-hover:text-white transition">→</span>
+              </div>
+            </button>
+          </div>
+
           <button
             onClick={() => setStarted(true)}
             className="px-8 py-3 bg-amazon-orange text-white font-semibold rounded-lg
