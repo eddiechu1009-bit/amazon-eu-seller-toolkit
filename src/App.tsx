@@ -2,8 +2,11 @@ import { useState, useCallback, useEffect } from 'react';
 import TabNav from './components/TabNav';
 import ModuleView from './components/ModuleView';
 import ProgressTracker from './components/ProgressTracker';
+import ProfitCalculator from './components/ProfitCalculator';
 import { ModuleId } from './data/types';
 import { allModules, moduleMap } from './data/modules';
+
+type AppMode = 'checklist' | 'profit';
 
 const STORAGE_KEY = 'seller-toolkit-checked';
 
@@ -23,6 +26,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ModuleId>('brand');
   const [checked, setChecked] = useState<Set<string>>(loadChecked);
   const [started, setStarted] = useState(false);
+  const [appMode, setAppMode] = useState<AppMode>('checklist');
 
   useEffect(() => {
     saveChecked(checked);
@@ -133,17 +137,53 @@ export default function App() {
         </div>
       </header>
 
-      <TabNav
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        completedCounts={completedCounts}
-        totalCounts={totalCounts}
-      />
+      {/* Mode Switch */}
+      <nav className="bg-white border-b sticky top-[52px] z-40 shadow-sm">
+        <div className="max-w-6xl mx-auto flex">
+          <button
+            onClick={() => setAppMode('checklist')}
+            className={`flex-1 px-4 py-2.5 text-center transition-all duration-200 border-b-3 text-sm font-medium ${
+              appMode === 'checklist'
+                ? 'border-amazon-orange text-amazon-dark bg-orange-50/50'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            📋 營運 Checklist
+          </button>
+          <button
+            onClick={() => setAppMode('profit')}
+            className={`flex-1 px-4 py-2.5 text-center transition-all duration-200 border-b-3 text-sm font-medium ${
+              appMode === 'profit'
+                ? 'border-amazon-orange text-amazon-dark bg-orange-50/50'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            💰 多國利潤比較
+          </button>
+        </div>
+      </nav>
 
-      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        <ProgressTracker checked={checked} />
-        <ModuleView module={currentModule} checked={checked} onToggle={toggleCheck} />
-      </main>
+      {appMode === 'checklist' && (
+        <>
+          <TabNav
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            completedCounts={completedCounts}
+            totalCounts={totalCounts}
+          />
+
+          <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+            <ProgressTracker checked={checked} />
+            <ModuleView module={currentModule} checked={checked} onToggle={toggleCheck} />
+          </main>
+        </>
+      )}
+
+      {appMode === 'profit' && (
+        <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+          <ProfitCalculator />
+        </main>
+      )}
 
       <footer className="text-center text-xs text-gray-400 py-6 border-t">
         資料來源：Amazon Seller Central、EUIPO、各國稅務機關等公開資料。內容僅供參考。
