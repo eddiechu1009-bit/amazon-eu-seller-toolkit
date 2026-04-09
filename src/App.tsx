@@ -149,6 +149,11 @@ export default function App() {
         資料來源：Amazon Seller Central、EUIPO、各國稅務機關等公開資料。內容僅供參考。
         <br />
         最後更新：2026年4月
+        <div className="mt-4 flex flex-wrap justify-center gap-3">
+          <a href="https://eddiechu1009-bit.github.io/amazon-eu-tools/" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-gray-100 hover:bg-amazon-orange/10 hover:text-amazon-dark rounded-lg transition-all duration-200">🇪🇺 新賣家準備工具</a>
+          <a href="https://eddiechu1009-bit.github.io/amazon-case-writer/" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-gray-100 hover:bg-amazon-orange/10 hover:text-amazon-dark rounded-lg transition-all duration-200">📝 Case 撰寫工具</a>
+          <a href="https://eddiechu1009-bit.github.io/amazon-eu-accounting/" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-gray-100 hover:bg-amazon-orange/10 hover:text-amazon-dark rounded-lg transition-all duration-200">📊 帳務分析工具</a>
+        </div>
       </footer>
     </div>
   );
