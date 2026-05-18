@@ -212,6 +212,7 @@ export default function App() {
           <a href="https://case-writer.netlify.app/" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-gray-100 hover:bg-amazon-orange/10 hover:text-amazon-dark rounded-lg transition-all duration-200">📝 Case 撰寫工具</a>
           <a href="https://eu-accounting.netlify.app/" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-gray-100 hover:bg-amazon-orange/10 hover:text-amazon-dark rounded-lg transition-all duration-200">📊 帳務分析工具</a>
           <a href="https://passkyc.netlify.app/" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-gray-100 hover:bg-amazon-orange/10 hover:text-amazon-dark rounded-lg transition-all duration-200">🪪 KYC 提交前自檢</a>
+          <a href="https://eu-seller-101.netlify.app/" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 bg-amazon-orange/10 text-amazon-dark hover:bg-amazon-orange hover:text-white rounded-lg transition-all duration-200 font-medium">📖 使用教材</a>
         </div>
       </footer>
     </div>
