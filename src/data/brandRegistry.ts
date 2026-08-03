@@ -24,7 +24,7 @@ export const brandRegistryModule: Module = {
       description: '品牌註冊需要已註冊或申請中的商標。歐洲建議申請 EUIPO 商標，一次涵蓋全歐盟 27 國',
       difficulty: 3,
       timeline: '直接申請 EUIPO：4-6 個月 / IP Accelerator：2-4 週可先用',
-      cost: 'EUIPO 線上申請 €850（一類）/ IP Accelerator 約 $600-2,000 USD',
+      cost: 'EUIPO 線上申請約 $935（一類）/ IP Accelerator 約 $600-2,000',
       tips: [
         '📌 兩種路徑：',
         '  • 直接申請 EUIPO（歐盟智慧財產局）：費用低但等待時間長',

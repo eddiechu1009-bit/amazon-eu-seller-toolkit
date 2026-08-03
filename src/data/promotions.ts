@@ -11,7 +11,7 @@ export const promotionsModule: Module = {
       title: 'Coupons（優惠券）— 新手首選',
       description: '在搜尋結果和產品頁面顯示綠色優惠券標籤，提升點擊率和轉換率',
       difficulty: 1,
-      cost: '每次兌換 €0.60 + 折扣金額',
+      cost: '每次兌換 $0.66 + 折扣金額',
       tips: [
         '📌 為什麼推薦新手優先使用：',
         '  • 設定簡單，門檻最低',
@@ -32,7 +32,7 @@ export const promotionsModule: Module = {
       title: 'Lightning Deals（限時秒殺）',
       description: '限時 4-12 小時的促銷活動，出現在 Amazon Deals 頁面，短期爆量利器',
       difficulty: 2,
-      cost: '€150/次（歐洲站）；大促期間可能更高',
+      cost: '$165/次（歐洲站）；大促期間可能更高',
       tips: [
         '📌 適用時機：',
         '  • 衝 BSR 排名',
@@ -56,7 +56,7 @@ export const promotionsModule: Module = {
       title: '7-Day Deals（七天促銷）',
       description: '持續一週的促銷活動，比 Lightning Deal 曝光時間更長',
       difficulty: 2,
-      cost: '€300/次（歐洲站）',
+      cost: '$330/次（歐洲站）',
       tips: [
         '📌 vs Lightning Deal：',
         '  • 時間更長（7 天 vs 4-12 小時）',

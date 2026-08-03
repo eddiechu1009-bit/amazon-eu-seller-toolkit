@@ -57,7 +57,7 @@ export const fbaInboundModule: Module = {
         '  • 易碎品：需緩衝包裝材料',
         '  • 多件組合包：需用透明塑膠袋或收縮膜包在一起',
         '📌 建議在工廠端完成貼標和包裝，到倉後不用再處理',
-        '📌 Amazon 也提供付費貼標服務（FBA Label Service），每件約 €0.20',
+        '📌 Amazon 也提供付費貼標服務（FBA Label Service），每件約 $0.22',
       ],
     },
     {
