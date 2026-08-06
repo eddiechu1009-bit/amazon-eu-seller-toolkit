@@ -174,7 +174,7 @@ export const promotionsModule: Module = {
         '  • 常態：Coupons（5-10% off）+ Sponsored Products 廣告',
         '  • 新品期：加上 Vine + Prime Exclusive Discount',
         '  • 大促期：加上 Lightning Deal + 廣告預算加倍',
-        '📌 不要同時疊加太多促銷！',
+        '📌 不建議同時疊加太多促銷。',
         '  • Coupon + Prime Exclusive Discount 可能會疊加，利潤會被吃掉',
         '  • 建議同一時間只用 1-2 種促銷工具',
         '  • 每次促銷後計算實際 ROI，決定是否繼續',

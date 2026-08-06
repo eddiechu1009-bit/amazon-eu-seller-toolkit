@@ -48,7 +48,7 @@ export const ppcStrategyModule: Module = {
         '  • 不要急著優化，讓數據跑至少 7-14 天',
         '📌 ACoS 目標：不設限，這階段重在收集數據',
         '📌 每日檢查花費是否正常，避免預算爆掉',
-        '📌 新品期 Amazon 會給流量紅利（Honeymoon Period），要把握！',
+        '📌 新品期 Amazon 會給流量紅利（Honeymoon Period），值得把握。',
       ],
     },
     {

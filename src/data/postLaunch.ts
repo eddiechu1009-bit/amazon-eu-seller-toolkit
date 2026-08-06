@@ -98,7 +98,7 @@ export const postLaunchModule: Module = {
       title: '④ 設定庫存補貨提醒',
       description: '斷貨是新賣家最大的殺手，會導致排名暴跌且難以恢復',
       difficulty: 1,
-      warning: '⚠️ FBA 斷貨後排名恢復可能需要 2-4 週，甚至更久。務必提前補貨！',
+      warning: '⚠️ FBA 斷貨後排名恢復可能需要 2-4 週，甚至更久。建議提前補貨。',
       tips: [
         '📌 操作路徑：Seller Central → Inventory → FBA Inventory → Restock Inventory',
         '📌 設定建議：',
@@ -130,7 +130,7 @@ export const postLaunchModule: Module = {
         '  • Order Defect Rate (ODR) < 1%',
         '  • Late Shipment Rate < 4%（FBA 不用擔心這個）',
         '  • Pre-fulfillment Cancel Rate < 2.5%',
-        '🚨 自發貨（FBM）2026 新增門檻 —— 未達標會停用 listing，不只是扣分：',
+        '📌 自發貨（FBM）2026 新增門檻 —— 未達標會停用 listing，不只是扣分：',
         '  • **OTDR（準時到貨率）≥ 90%**：2026/7/15 起要求，**2026/9/1 起未達標的 listing 可能被停用**。',
         '    ⚠️ 適用站別：德國、法國、義大利、西班牙同步適用（UK 站此要求已先行實施），不是只有德國',
         '    查詢位置：各站 Performance Dashboard → Shipping（例 sellercentral.amazon.de/performance/detail/shipping）',
