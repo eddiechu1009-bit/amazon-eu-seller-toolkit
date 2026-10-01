@@ -1,237 +1,166 @@
 import { useState, useMemo } from 'react';
 
-/* ── Size Tier Definitions (2025 Feb+) ── */
-type SizeTier = 'light-envelope' | 'std-envelope' | 'large-envelope' | 'xl-envelope'
-  | 'small-parcel' | 'std-parcel' | 'small-oversize' | 'std-oversize';
+/**
+ * 多國利潤比較器 —— 費率與計算邏輯不在這支裡面。
+ * 舊版自帶一份手抄的近似費率（德國輕型信封 2.33 其實是 DE-only 欄、倉儲一律 €26/m³、佣金用不含稅價算），
+ * 而且 € / £ / $ 直接混算，「最佳利潤國家」會系統性偏向英國。
+ * 現在改用 eu-seller-101 成本計算機同一份引擎（public/eu-calc/，由學習地圖 tools/build_seller_calc.py 同步）：
+ * 費率逐格取自 Amazon Rate Card Europe 2026-02-01，佣金依品類、用含稅售價計算，金額先換到各站當地幣別再算。
+ */
 
-interface TierDef {
-  id: SizeTier;
-  label: string;
-  labelEn: string;
-  maxL: number; maxW: number; maxH: number; // cm
-  maxWeight: number; // kg (shipping weight)
+interface EngineCat { id: string; name: string }
+interface EngineResult {
+  ok?: boolean; error?: string; unavailable?: string;
+  exVat: number; fulfil: number; storage: number; profit: number; margin: number;
+  ref: { fee: number; closing: number };
+  cls?: { tier?: { name: string }; dimG: number; ship?: number; basis?: string };
 }
+interface Engine {
+  CATS: [string, string, unknown, unknown?][];
+  CAT: Record<string, EngineCat>;
+  VAT: Record<string, number>;
+  FUEL_PCT: number;
+  calc: (i: Record<string, unknown>, mode?: string) => EngineResult;
+}
+const engine = (window as unknown as { EUCALC_ENGINE?: Engine }).EUCALC_ENGINE;
 
-const sizeTiers: TierDef[] = [
-  { id: 'light-envelope', label: '輕型信封', labelEn: 'Light Envelope', maxL: 33, maxW: 23, maxH: 2.5, maxWeight: 0.08 },
-  { id: 'std-envelope', label: '標準信封', labelEn: 'Standard Envelope', maxL: 33, maxW: 23, maxH: 2.5, maxWeight: 0.46 },
-  { id: 'large-envelope', label: '大型信封', labelEn: 'Large Envelope', maxL: 33, maxW: 23, maxH: 4, maxWeight: 0.96 },
-  { id: 'xl-envelope', label: '特大信封', labelEn: 'Extra-Large Envelope', maxL: 33, maxW: 23, maxH: 6, maxWeight: 0.96 },
-  { id: 'small-parcel', label: '小型包裹', labelEn: 'Small Parcel', maxL: 35, maxW: 25, maxH: 12, maxWeight: 3.9 },
-  { id: 'std-parcel', label: '標準包裹', labelEn: 'Standard Parcel', maxL: 45, maxW: 34, maxH: 26, maxWeight: 11.9 },
-  { id: 'small-oversize', label: '小型超大', labelEn: 'Small Oversize', maxL: 61, maxW: 46, maxH: 46, maxWeight: 25.82 },
-  { id: 'std-oversize', label: '標準超大', labelEn: 'Standard Oversize', maxL: 120, maxW: 60, maxH: 60, maxWeight: 31.5 },
+const MARKETS = [
+  { code: 'DE', name: '德國', flag: '🇩🇪', sym: '€' },
+  { code: 'FR', name: '法國', flag: '🇫🇷', sym: '€' },
+  { code: 'IT', name: '義大利', flag: '🇮🇹', sym: '€' },
+  { code: 'ES', name: '西班牙', flag: '🇪🇸', sym: '€' },
+  { code: 'UK', name: '英國', flag: '🇬🇧', sym: '£' },
 ];
 
-/* ── FBA Fee Tables (2026 Feb 1+, Local & Pan-EU Fulfillment) ── */
-// Source: Amazon Rate Card Europe — Effective 1st February 2026
-// Standard FBA (non-low-price), Local and Pan-European
-// For envelopes: fixed fee per weight band
-// For parcels/oversize: base rate + incremental per 100g
-// Using DE Only column (not CEP) for DE
+const CALC_URL = 'https://eu-seller-101.netlify.app/calculator/';
+const KEY = 'eu-toolkit-profit-v2';
 
-interface FeeEntry { base: number; per100g: number; }
-type FeeTable = Record<string, Record<SizeTier, FeeEntry>>;
-
-// Weight bands for envelopes (fixed fees, per100g=0)
-// For parcels: base = fee at first 100g, per100g = incremental
-const fbaFees: FeeTable = {
-  DE: {
-    'light-envelope': { base: 2.33, per100g: 0 },    // ≤100g: 2.33-2.54
-    'std-envelope':   { base: 2.57, per100g: 0 },     // ≤460g: ~2.57-2.72
-    'large-envelope': { base: 3.06, per100g: 0 },     // ≤960g
-    'xl-envelope':    { base: 3.43, per100g: 0 },     // ≤960g
-    'small-parcel':   { base: 3.50, per100g: 0.07 },  // base + 0.07/100g
-    'std-parcel':     { base: 3.50, per100g: 0.07 },
-    'small-oversize': { base: 5.79, per100g: 0.08 },
-    'std-oversize':   { base: 7.50, per100g: 0.10 },
-  },
-  FR: {
-    'light-envelope': { base: 2.75, per100g: 0 },
-    'std-envelope':   { base: 3.33, per100g: 0 },
-    'large-envelope': { base: 3.95, per100g: 0 },
-    'xl-envelope':    { base: 4.05, per100g: 0 },
-    'small-parcel':   { base: 5.45, per100g: 0.08 },
-    'std-parcel':     { base: 5.45, per100g: 0.08 },
-    'small-oversize': { base: 7.80, per100g: 0.10 },
-    'std-oversize':   { base: 9.50, per100g: 0.12 },
-  },
-  IT: {
-    'light-envelope': { base: 3.23, per100g: 0 },
-    'std-envelope':   { base: 3.45, per100g: 0 },
-    'large-envelope': { base: 3.92, per100g: 0 },
-    'xl-envelope':    { base: 4.15, per100g: 0 },
-    'small-parcel':   { base: 4.83, per100g: 0.06 },
-    'std-parcel':     { base: 4.83, per100g: 0.06 },
-    'small-oversize': { base: 7.20, per100g: 0.08 },
-    'std-oversize':   { base: 9.00, per100g: 0.10 },
-  },
-  ES: {
-    'light-envelope': { base: 2.77, per100g: 0 },
-    'std-envelope':   { base: 3.26, per100g: 0 },
-    'large-envelope': { base: 3.49, per100g: 0 },
-    'xl-envelope':    { base: 3.57, per100g: 0 },
-    'small-parcel':   { base: 3.85, per100g: 0.07 },
-    'std-parcel':     { base: 3.85, per100g: 0.07 },
-    'small-oversize': { base: 6.00, per100g: 0.09 },
-    'std-oversize':   { base: 7.80, per100g: 0.11 },
-  },
-  UK: {
-    'light-envelope': { base: 1.83, per100g: 0 },
-    'std-envelope':   { base: 2.10, per100g: 0 },
-    'large-envelope': { base: 2.42, per100g: 0 },
-    'xl-envelope':    { base: 2.48, per100g: 0 },
-    'small-parcel':   { base: 2.97, per100g: 0.05 },
-    'std-parcel':     { base: 2.97, per100g: 0.05 },
-    'small-oversize': { base: 5.10, per100g: 0.07 },
-    'std-oversize':   { base: 6.50, per100g: 0.09 },
-  },
-};
-
-interface CountryInfo {
-  code: string; name: string; flag: string; currency: string; currencySymbol: string;
-  vatRate: number; eprAnnual: number; monthlyStoragePerCbm: number;
-}
-
-const countryList: CountryInfo[] = [
-  { code: 'DE', name: '德國', flag: '🇩🇪', currency: 'EUR', currencySymbol: '€', vatRate: 19, eprAnnual: 100, monthlyStoragePerCbm: 26 },
-  { code: 'FR', name: '法國', flag: '🇫🇷', currency: 'EUR', currencySymbol: '€', vatRate: 20, eprAnnual: 120, monthlyStoragePerCbm: 26 },
-  { code: 'IT', name: '義大利', flag: '🇮🇹', currency: 'EUR', currencySymbol: '€', vatRate: 22, eprAnnual: 80, monthlyStoragePerCbm: 26 },
-  { code: 'ES', name: '西班牙', flag: '🇪🇸', currency: 'EUR', currencySymbol: '€', vatRate: 21, eprAnnual: 80, monthlyStoragePerCbm: 26 },
-  { code: 'UK', name: '英國', flag: '🇬🇧', currency: 'GBP', currencySymbol: '£', vatRate: 20, eprAnnual: 80, monthlyStoragePerCbm: 22 },
-];
-
-/* ── Helpers ── */
-function determineSizeTier(l: number, w: number, h: number, weightKg: number): TierDef {
-  const dims = [l, w, h].sort((a, b) => b - a); // longest first
-  const [dl, dw, dh] = dims;
-  for (const tier of sizeTiers) {
-    if (dl <= tier.maxL && dw <= tier.maxW && dh <= tier.maxH && weightKg <= tier.maxWeight) {
-      return tier;
-    }
-  }
-  return sizeTiers[sizeTiers.length - 1]; // fallback to largest
-}
-
-function calcShippingWeight(l: number, w: number, h: number, weightKg: number): number {
-  const dimWeight = (l * w * h) / 5000;
-  return Math.max(weightKg, dimWeight);
-}
-
-function calcFbaFee(country: string, tier: SizeTier, shippingWeightKg: number): number {
-  const entry = fbaFees[country]?.[tier];
-  if (!entry) return 0;
-  if (tier.includes('envelope')) return entry.base;
-  // For parcels: base + incremental per 100g above first 100g
-  const extraGrams = Math.max(0, shippingWeightKg * 1000 - 100);
-  const extra100g = Math.ceil(extraGrams / 100);
-  return entry.base + extra100g * entry.per100g;
-}
-
-/* ── Input ── */
 interface ProductInput {
-  sellingPrice: number;
-  productCost: number;
-  shippingToFba: number;
-  lengthCm: number;
-  widthCm: number;
-  heightCm: number;
+  priceEur: number;   // 歐盟四站含稅售價（€）
+  priceGbp: number;   // 英國含稅售價（£）
+  cat: string;
+  cost: number;       // 產品成本／件（USD）
+  freight: number;    // 頭程／件（USD）
+  lengthCm: number; widthCm: number; heightCm: number;
   weightKg: number;
-  referralFeePct: number;
-  unitsPerMonth: number;
+  units: number;      // 月銷量
+  months: number;     // 平均在倉月數
+  fxUsd: number; fxEur: number; fxGbp: number;   // 1 外幣 = ? 新台幣
 }
 
 const defaultInput: ProductInput = {
-  sellingPrice: 25,
-  productCost: 5,
-  shippingToFba: 2,
-  lengthCm: 25,
-  widthCm: 15,
-  heightCm: 8,
-  weightKg: 0.5,
-  referralFeePct: 15,
-  unitsPerMonth: 100,
+  priceEur: 25, priceGbp: 22, cat: 'other', cost: 5, freight: 2,
+  lengthCm: 25, widthCm: 15, heightCm: 8, weightKg: 0.5,
+  units: 100, months: 2, fxUsd: 32, fxEur: 35, fxGbp: 41,
 };
 
-/* ── Component ── */
+function loadInput(): ProductInput {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return { ...defaultInput, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return defaultInput;
+}
+
 export default function ProfitCalculator() {
-  const [input, setInput] = useState<ProductInput>(defaultInput);
-  const update = <K extends keyof ProductInput>(key: K, val: ProductInput[K]) => setInput(prev => ({ ...prev, [key]: val }));
+  const [input, setInput] = useState<ProductInput>(loadInput);
+  const update = <K extends keyof ProductInput>(key: K, val: ProductInput[K]) => setInput(prev => {
+    const next = { ...prev, [key]: val };
+    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  });
 
-  const shippingWeight = calcShippingWeight(input.lengthCm, input.widthCm, input.heightCm, input.weightKg);
-  const dimWeight = (input.lengthCm * input.widthCm * input.heightCm) / 5000;
-  const tier = determineSizeTier(input.lengthCm, input.widthCm, input.heightCm, shippingWeight);
+  const results = useMemo(() => {
+    if (!engine) return [];
+    return MARKETS.map(m => {
+      const uk = m.code === 'UK';
+      const r = engine.calc({
+        dest: m.code, inv: '', mode: 'local', cep: false, lithium: false, dgStorage: false,
+        price: uk ? input.priceGbp : input.priceEur, vat: engine.VAT[m.code], cat: input.cat,
+        l: input.lengthCm, w: input.widthCm, h: input.heightCm, wt: input.weightKg * 1000,
+        ccy: 'USD', cost: input.cost, freight: input.freight, duty: 0,
+        fxEur: input.fxEur, fxGbp: input.fxGbp, fxUsd: input.fxUsd,
+        months: input.months, season: 'avg', units: input.units, sub: 0,
+        fuel: engine.FUEL_PCT, ads: 0, otherpct: 0, fbmship: 0,
+      }, 'local');
+      // 跨站比大小一律換成歐元（利潤率本身與幣別無關）
+      const toEur = uk ? input.fxGbp / input.fxEur : 1;
+      return { m, r, monthly: r.ok ? r.profit * input.units : 0, monthlyEur: r.ok ? r.profit * input.units * toEur : 0 };
+    });
+  }, [input]);
 
-  const results = useMemo(() => countryList.map(c => {
-    const fbaFee = calcFbaFee(c.code, tier.id, shippingWeight);
-    const priceExVat = input.sellingPrice / (1 + c.vatRate / 100);
-    const referralFee = priceExVat * (input.referralFeePct / 100);
-    const volumeCbm = (input.lengthCm * input.widthCm * input.heightCm) / 1000000;
-    const storageCost = volumeCbm * c.monthlyStoragePerCbm;
-    const eprPerUnit = c.eprAnnual / Math.max(input.unitsPerMonth * 12, 1);
-    const totalFees = referralFee + fbaFee + storageCost + eprPerUnit;
-    const profitPerUnit = priceExVat - input.productCost - input.shippingToFba - totalFees;
-    const margin = priceExVat > 0 ? (profitPerUnit / priceExVat) * 100 : 0;
-    return { country: c, fbaFee, priceExVat, referralFee, storageCost, eprPerUnit, totalFees, profitPerUnit, margin, monthlyProfit: profitPerUnit * input.unitsPerMonth };
-  }), [input, tier, shippingWeight]);
+  if (!engine) {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+        計算引擎沒有載入。請改用 <a href={CALC_URL} className="underline" target="_blank" rel="noopener noreferrer">歐洲站成本計算機</a>。
+      </div>
+    );
+  }
 
-  const best = results.reduce((b, r) => r.margin > b.margin ? r : b, results[0]);
+  const okRows = results.filter(x => x.r.ok);
+  const best = okRows.length ? okRows.reduce((b, x) => x.monthlyEur > b.monthlyEur ? x : b, okRows[0]) : null;
+  const firstErr = results.find(x => x.r.error)?.r.error;
+  const cls = results.find(x => x.r.cls)?.r.cls;
   const fmt = (v: number, sym: string) => `${v < 0 ? '-' : ''}${sym}${Math.abs(v).toFixed(2)}`;
 
   return (
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-bold text-amazon-dark flex items-center gap-2">💰 多國利潤比較器</h2>
-        <p className="text-gray-500 text-sm mt-1">輸入產品尺寸和重量，自動判斷 FBA 尺寸分級並計算五國利潤</p>
+        <p className="text-gray-500 text-sm mt-1">同一件商品放在五個站的當地倉（Pan-EU／當地 FBA）各賺多少。要比較 EFN、英國↔歐盟遠程配送、自發貨，或看單站完整明細與損益兩平售價，請用 <a href={CALC_URL} target="_blank" rel="noopener noreferrer" className="underline text-amazon-orange">歐洲站成本計算機</a>。</p>
       </div>
 
-      {/* Input */}
       <div className="bg-white rounded-xl border p-4 sm:p-5 shadow-sm mb-4 animate-fadeIn">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">📦 產品資訊</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <InputField label="售價（含稅 €）" value={input.sellingPrice} onChange={v => update('sellingPrice', v)} prefix="€" />
-          <InputField label="產品成本（$）" value={input.productCost} onChange={v => update('productCost', v)} prefix="$" />
-          <InputField label="頭程運費/件（$）" value={input.shippingToFba} onChange={v => update('shippingToFba', v)} prefix="$" />
-          <InputField label="佣金 (%)" value={input.referralFeePct} onChange={v => update('referralFeePct', v)} suffix="%" />
-          <InputField label="月銷量 (件)" value={input.unitsPerMonth} onChange={v => update('unitsPerMonth', v)} />
+          <InputField label="歐盟四站售價（含 VAT）" value={input.priceEur} onChange={v => update('priceEur', v)} prefix="€" />
+          <InputField label="英國售價（含 VAT）" value={input.priceGbp} onChange={v => update('priceGbp', v)} prefix="£" />
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">品類（決定佣金）</label>
+            <select value={input.cat} onChange={e => update('cat', e.target.value)}
+              className="w-full px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-amazon-orange/50">
+              {engine.CATS.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </div>
+          <InputField label="產品成本／件（USD）" value={input.cost} onChange={v => update('cost', v)} prefix="$" />
+          <InputField label="頭程運費／件（USD）" value={input.freight} onChange={v => update('freight', v)} prefix="$" />
+          <InputField label="月銷量（件／站）" value={input.units} onChange={v => update('units', v)} />
+          <InputField label="平均在倉月數" value={input.months} onChange={v => update('months', v)} suffix="個月" />
         </div>
+        <details className="mt-3 text-xs text-gray-500">
+          <summary className="cursor-pointer">匯率（1 外幣 = ? 新台幣，可改）</summary>
+          <div className="grid grid-cols-3 gap-3 mt-2">
+            <InputField label="USD" value={input.fxUsd} onChange={v => update('fxUsd', v)} />
+            <InputField label="EUR" value={input.fxEur} onChange={v => update('fxEur', v)} />
+            <InputField label="GBP" value={input.fxGbp} onChange={v => update('fxGbp', v)} />
+          </div>
+        </details>
       </div>
 
       <div className="bg-white rounded-xl border p-4 sm:p-5 shadow-sm mb-6 animate-fadeIn">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">📐 尺寸與重量（決定 FBA 費用）</h3>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">📐 包裝後尺寸與重量（決定 FBA 費用）</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <InputField label="長 (cm)" value={input.lengthCm} onChange={v => update('lengthCm', v)} />
           <InputField label="寬 (cm)" value={input.widthCm} onChange={v => update('widthCm', v)} />
           <InputField label="高 (cm)" value={input.heightCm} onChange={v => update('heightCm', v)} />
-          <InputField label="實際重量 (kg)" value={input.weightKg} onChange={v => update('weightKg', v)} />
+          <InputField label="單件重量 (kg)" value={input.weightKg} onChange={v => update('weightKg', v)} />
         </div>
-
-        {/* Size tier result */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <div>
-              <span className="text-blue-600 font-medium">尺寸分級：</span>
-              <span className="font-semibold text-blue-800">{tier.label}</span>
-              <span className="text-blue-500 ml-1">({tier.labelEn})</span>
-            </div>
-            <div className="text-blue-600">
-              材積重：<span className="font-mono">{dimWeight.toFixed(2)} kg</span>
-            </div>
-            <div className="text-blue-600">
-              計費重量：<span className="font-mono font-semibold">{shippingWeight.toFixed(2)} kg</span>
-              {dimWeight > input.weightKg && <span className="text-xs text-blue-500 ml-1">（取材積重）</span>}
-            </div>
+        {cls && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+            尺寸分級：<span className="font-semibold text-blue-800">{cls.tier ? cls.tier.name : '特殊超大件（費率另計）'}</span>
+            <span className="ml-3">材積重 {(cls.dimG / 1000).toFixed(2)} kg（長×寬×高÷5,000）</span>
+            {cls.basis && <span className="ml-3 text-xs text-blue-500">計費依據：{cls.basis}</span>}
           </div>
-          <p className="text-xs text-blue-500 mt-1">
-            材積重公式：長 × 寬 × 高 ÷ 5,000 = {input.lengthCm} × {input.widthCm} × {input.heightCm} ÷ 5,000 = {dimWeight.toFixed(2)} kg
-          </p>
-        </div>
+        )}
       </div>
 
-      {/* Results Table */}
+      {firstErr && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-700">{firstErr}</div>
+      )}
+
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden mb-6">
         <div className="px-4 py-3 bg-gray-50 border-b">
-          <h3 className="font-semibold text-gray-700">📊 五國利潤比較</h3>
+          <h3 className="font-semibold text-gray-700">📊 五國利潤比較（各站當地幣別）</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -240,29 +169,36 @@ export default function ProfitCalculator() {
                 <th className="text-left px-3 py-2 text-gray-500">國家</th>
                 <th className="text-right px-3 py-2 text-gray-500">不含稅售價</th>
                 <th className="text-right px-3 py-2 text-gray-500">佣金</th>
-                <th className="text-right px-3 py-2 text-gray-500">FBA 費</th>
-                <th className="text-right px-3 py-2 text-gray-500">倉儲/月</th>
-                <th className="text-right px-3 py-2 text-gray-500">總費用</th>
+                <th className="text-right px-3 py-2 text-gray-500">FBA 配送費</th>
+                <th className="text-right px-3 py-2 text-gray-500">倉儲</th>
                 <th className="text-right px-3 py-2 text-gray-500">單件利潤</th>
                 <th className="text-right px-3 py-2 text-gray-500">利潤率</th>
                 <th className="text-right px-3 py-2 text-gray-500">月利潤</th>
               </tr>
             </thead>
             <tbody>
-              {results.map(r => {
-                const s = r.country.currencySymbol;
-                const isBest = r === best;
+              {results.map(({ m, r, monthly }) => {
+                const s = m.sym;
+                if (!r.ok) {
+                  return (
+                    <tr key={m.code} className="border-t">
+                      <td className="px-3 py-2.5 font-medium">{m.flag} {m.name}</td>
+                      <td colSpan={7} className="px-3 py-2.5 text-gray-400 text-xs">{r.unavailable || '輸入有誤，未計算'}</td>
+                    </tr>
+                  );
+                }
+                const isBest = best !== null && best.m.code === m.code;
+                const pct = r.margin * 100;
                 return (
-                  <tr key={r.country.code} className={`border-t ${isBest ? 'bg-green-50' : 'hover:bg-gray-50'}`}>
-                    <td className="px-3 py-2.5 font-medium">{r.country.flag} {r.country.name}{isBest && <span className="ml-1 text-xs text-green-600">⭐</span>}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-gray-700">{fmt(r.priceExVat, s)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-gray-500">{fmt(r.referralFee, s)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-orange-600 font-semibold">{fmt(r.fbaFee, s)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-gray-400">{fmt(r.storageCost, s)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-red-600">{fmt(r.totalFees, s)}</td>
-                    <td className={`px-3 py-2.5 text-right font-mono font-semibold ${r.profitPerUnit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(r.profitPerUnit, s)}</td>
-                    <td className={`px-3 py-2.5 text-right font-semibold ${r.margin >= 20 ? 'text-green-700' : r.margin >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>{r.margin.toFixed(1)}%</td>
-                    <td className={`px-3 py-2.5 text-right font-mono font-semibold ${r.monthlyProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(r.monthlyProfit, s)}</td>
+                  <tr key={m.code} className={`border-t ${isBest ? 'bg-green-50' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-2.5 font-medium">{m.flag} {m.name}{isBest && <span className="ml-1 text-xs text-green-600">⭐</span>}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-gray-700">{fmt(r.exVat, s)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-gray-500">{fmt(r.ref.fee + r.ref.closing, s)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-orange-600 font-semibold">{fmt(r.fulfil, s)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-gray-400">{fmt(r.storage, s)}</td>
+                    <td className={`px-3 py-2.5 text-right font-mono font-semibold ${r.profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(r.profit, s)}</td>
+                    <td className={`px-3 py-2.5 text-right font-semibold ${pct >= 20 ? 'text-green-700' : pct >= 0 ? 'text-yellow-600' : 'text-red-600'}`}>{pct.toFixed(1)}%</td>
+                    <td className={`px-3 py-2.5 text-right font-mono font-semibold ${monthly >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(monthly, s)}</td>
                   </tr>
                 );
               })}
@@ -271,21 +207,21 @@ export default function ProfitCalculator() {
         </div>
       </div>
 
-      {/* Best highlight */}
-      <div className={`rounded-xl p-4 mb-6 text-center ${best.profitPerUnit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-        <p className="text-sm text-gray-600 mb-1">最佳利潤國家</p>
-        <p className="text-2xl font-bold">{best.country.flag} {best.country.name}</p>
-        <p className={`text-lg font-semibold mt-1 ${best.profitPerUnit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-          單件利潤 {fmt(best.profitPerUnit, best.country.currencySymbol)} · 利潤率 {best.margin.toFixed(1)}%
-        </p>
-      </div>
+      {best && (
+        <div className={`rounded-xl p-4 mb-6 text-center ${best.r.profit >= 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          <p className="text-sm text-gray-600 mb-1">月利潤最高的站（換成歐元比較）</p>
+          <p className="text-2xl font-bold">{best.m.flag} {best.m.name}</p>
+          <p className={`text-lg font-semibold mt-1 ${best.r.profit >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+            月利潤約 {fmt(best.monthlyEur, '€')} · 利潤率 {(best.r.margin * 100).toFixed(1)}%
+          </p>
+        </div>
+      )}
 
-      {/* Notes */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-700 space-y-1">
-        <p>💡 FBA 費用依據 Amazon 2026年2月生效的歐洲 Local & Pan-EU Fulfillment 費率表計算。</p>
-        <p>💡 計費重量 = max(實際重量, 材積重)。材積重 = 長 × 寬 × 高 ÷ 5,000。</p>
-        <p>💡 倉儲費以月均庫存體積估算。EPR 包裝費以年費分攤至每件。</p>
-        <p>💡 未包含廣告費、退貨成本、長期倉儲費等變動成本。實際費用以 Seller Central 為準。</p>
+        <p>💡 這是估算，不是報價；實際費用以 Seller Central 的 Revenue Calculator 與官方費率頁為準。</p>
+        <p>💡 FBA 配送費：從當地倉出貨的費率；德國以未參加 CEP 計（每件 +€0.26），另含 1.5% 燃油及物流附加費（2026-04-17 起）。</p>
+        <p>💡 佣金依品類、用含稅售價計算，含各站最低佣金。倉儲費以全年平均月費率 × 在倉月數估算。</p>
+        <p>💡 未包含：VAT 申報與稅代費、EPR 註冊費、月租（£25／€39）、廣告、退貨、關稅、超齡庫存費。</p>
         <p>📌 費率來源：<a href="https://m.media-amazon.com/images/G/02/sell/images/260114-FBA-Rate-Card-EN.pdf" target="_blank" rel="noopener noreferrer" className="underline">Amazon Rate Card Europe — Effective 1st February 2026 (PDF)</a></p>
       </div>
     </div>
