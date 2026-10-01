@@ -178,13 +178,18 @@ function storageRate(region, cls, cat, dgStorage, season){
 }
 
 /* 主計算：in 為一個純資料物件（不碰 DOM） */
+const MAXP = 1e6;
+const LIMITS = {price:[MAXP,'售價'], cost:[MAXP,'成本'], freight:[MAXP,'頭程'], fbmship:[MAXP,'FBM 運費'], sub:[MAXP,'月租'],
+  l:[1000,'尺寸'], w:[1000,'尺寸'], h:[1000,'尺寸'], wt:[1e6,'重量'], units:[1e7,'月銷量'], months:[120,'在倉月數'],
+  vat:[100,'VAT'], duty:[1000,'關稅'], ads:[1000,'廣告比例'], otherpct:[1000,'其他費用比例'], fuel:[100,'附加費'],
+  fxEur:[1e4,'EUR 匯率'], fxGbp:[1e4,'GBP 匯率'], fxUsd:[1e4,'USD 匯率']};
 function validate(i){
   const bad = [];
   const pos = (k,label)=>{ if(!(Number.isFinite(i[k]) && i[k]>0)) bad.push(label); };
   const nonneg = (k,label)=>{ if(!(Number.isFinite(i[k]) && i[k]>=0)) bad.push(label); };
   pos('price','售價'); ['l','w','h'].forEach(k=>pos(k,'尺寸')); pos('wt','重量'); pos('units','月銷量');
-  // 支援範圍：單價、成本、運費都不超過 1,000,000（超出不計算，避免顯示看似有效的結果）
-  ['price','cost','freight','fbmship','sub'].forEach(k=>{ if(Number.isFinite(i[k]) && i[k] > 1e6) bad.push('超出支援範圍（' + k + ' ≤ 1,000,000）'); });
+  // 支援範圍：每個數值欄位都有上限（超出不計算，避免顯示看似有效的結果或無限大）
+  Object.entries(LIMITS).forEach(([k,[max,label]])=>{ if(Number.isFinite(i[k]) && i[k] > max) bad.push(label + '超出支援範圍（≤ ' + max.toLocaleString('en') + '）'); });
   ['vat','cost','freight','duty','months','sub','ads','otherpct','fuel'].forEach(k=>nonneg(k,k));
   if(i.mode==='fbm') nonneg('fbmship','FBM 運費');
   const needFx = i.ccy!==(i.dest==='UK'?'GBP':'EUR') || i.mode==='remote' || (i.dest==='UK' && i.mode!=='local');
@@ -230,6 +235,7 @@ function calc(i, mode){
   const cost = toLocal(i.cost), freight = toLocal(i.freight), duty = (cost+freight)*i.duty/100;
   const fees = fulfil + ref.fee + ref.closing + storage + sub + ads + other;
   const profit = exVat - fees - cost - freight - duty;
+  if(![profit, fees, cost, freight, duty, storage].every(Number.isFinite)) return {mode, error:'請檢查：輸入數值過大，無法計算'};
   return {mode, price:i.price, exVat, vatAmt:i.price-exVat, cls, fulfil, fulfilParts, ref, storage, region, sub, ads, other, cost, freight, duty, profit,
           margin: exVat ? profit/exVat : 0, ok:true};
 }
@@ -241,8 +247,8 @@ function breakEven(i, mode){
   // 最低佣金的轉折點：費率 × 售價 = 最低佣金
   const cand = new Set(pts);
   for(const pct of [5,7,8,9,10,12,13,15,20,45]){ cand.add((uk?0.25:0.30)/(pct/100)); cand.add(20/(pct/100)); }
-  cand.add(1e9);                                                  // 最後一段延伸到極大值，不設固定上限
-  const xs = [...cand].filter(x=>x>0).sort((a,b)=>a-b);
+  cand.add(MAXP);                                                 // 最後一段延伸到支援上限（售價 ≤ 1,000,000）
+  const xs = [...cand].filter(x=>x>0 && x<=MAXP).sort((a,b)=>a-b);
   // 進位到分，並回代確認真的不虧（顯示的價格要是賣得出去的價格）
   const cent = p => { let c = Math.ceil(p*100 - 1e-9)/100; for(let k=0;k<5 && (P(c)==null || P(c)<0);k++) c = Math.round(c*100+1)/100; return P(c)>=0 ? c : null; };
   for(let s=0; s<xs.length-1; s++){
@@ -254,5 +260,5 @@ function breakEven(i, mode){
   }
   return null;
 }
-window.EUCALC_ENGINE = {CATS, CAT, VAT, SUB, FUEL_PCT, EU5, ruleText, referral, classify, lookup, storageRate, calc, breakEven, validate, available};
+window.EUCALC_ENGINE = {MAXP, LIMITS, CATS, CAT, VAT, SUB, FUEL_PCT, EU5, ruleText, referral, classify, lookup, storageRate, calc, breakEven, validate, available};
 })();
