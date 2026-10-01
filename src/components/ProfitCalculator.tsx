@@ -54,12 +54,28 @@ const defaultInput: ProductInput = {
   units: 100, months: 2, fxUsd: 32, fxEur: 35, fxGbp: 41,
 };
 
+// 讀回存檔時逐欄驗證：舊版或手改過的資料不可讓頁面拋錯，也不可帶進離譜的數字
+const LIMITS: Record<Exclude<keyof ProductInput, 'cat'>, [number, number]> = {
+  priceEur: [0, 1e6], priceGbp: [0, 1e6], cost: [0, 1e6], freight: [0, 1e6],
+  lengthCm: [0, 1000], widthCm: [0, 1000], heightCm: [0, 1000], weightKg: [0, 1000],
+  units: [0, 1e6], months: [0, 120], fxUsd: [0, 1e4], fxEur: [0, 1e4], fxGbp: [0, 1e4],
+};
+
 function loadInput(): ProductInput {
+  const out: ProductInput = { ...defaultInput };
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...defaultInput, ...JSON.parse(raw) };
+    const saved = raw ? JSON.parse(raw) : null;
+    if (saved && typeof saved === 'object') {
+      for (const k of Object.keys(LIMITS) as (keyof typeof LIMITS)[]) {
+        const v = saved[k];
+        const [lo, hi] = LIMITS[k];
+        if (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi) out[k] = v;
+      }
+      if (typeof saved.cat === 'string' && engine?.CAT[saved.cat]) out.cat = saved.cat;
+    }
   } catch { /* ignore */ }
-  return defaultInput;
+  return out;
 }
 
 export default function ProfitCalculator() {
@@ -85,7 +101,8 @@ export default function ProfitCalculator() {
       }, 'local');
       // 跨站比大小一律換成歐元（利潤率本身與幣別無關）
       const toEur = uk ? input.fxGbp / input.fxEur : 1;
-      return { m, r, monthly: r.ok ? r.profit * input.units : 0, monthlyEur: r.ok ? r.profit * input.units * toEur : 0 };
+      const monthly = r.ok ? r.profit * input.units : NaN;
+      return { m, r, monthly, monthlyEur: monthly * toEur };
     });
   }, [input]);
 
@@ -97,7 +114,8 @@ export default function ProfitCalculator() {
     );
   }
 
-  const okRows = results.filter(x => x.r.ok);
+  // 只拿算得出有限數字的站來排名（極端輸入可能讓月利潤變成無限大）
+  const okRows = results.filter(x => x.r.ok && Number.isFinite(x.r.profit) && Number.isFinite(x.monthlyEur));
   const best = okRows.length ? okRows.reduce((b, x) => x.monthlyEur > b.monthlyEur ? x : b, okRows[0]) : null;
   const firstErr = results.find(x => x.r.error)?.r.error;
   const cls = results.find(x => x.r.cls)?.r.cls;
@@ -179,11 +197,11 @@ export default function ProfitCalculator() {
             <tbody>
               {results.map(({ m, r, monthly }) => {
                 const s = m.sym;
-                if (!r.ok) {
+                if (!r.ok || !Number.isFinite(r.profit) || !Number.isFinite(monthly)) {
                   return (
                     <tr key={m.code} className="border-t">
                       <td className="px-3 py-2.5 font-medium">{m.flag} {m.name}</td>
-                      <td colSpan={7} className="px-3 py-2.5 text-gray-400 text-xs">{r.unavailable || '輸入有誤，未計算'}</td>
+                      <td colSpan={7} className="px-3 py-2.5 text-gray-400 text-xs">{r.unavailable || r.error || '數字超出可計算範圍，未計算'}</td>
                     </tr>
                   );
                 }
@@ -222,6 +240,7 @@ export default function ProfitCalculator() {
         <p>💡 FBA 配送費：從當地倉出貨的費率；德國以未參加 CEP 計（每件 +€0.26），另含 1.5% 燃油及物流附加費（2026-04-17 起）。</p>
         <p>💡 佣金依品類、用含稅售價計算，含各站最低佣金。倉儲費以全年平均月費率 × 在倉月數估算。</p>
         <p>💡 未包含：VAT 申報與稅代費、EPR 註冊費、月租（£25／€39）、廣告、退貨、關稅、超齡庫存費。</p>
+        <p>💡 未計 Low-Price FBA（低價商品配送費率）：符合資格的低價商品，實際配送費會比這裡低。</p>
         <p>📌 費率來源：<a href="https://m.media-amazon.com/images/G/02/sell/images/260114-FBA-Rate-Card-EN.pdf" target="_blank" rel="noopener noreferrer" className="underline">Amazon Rate Card Europe — Effective 1st February 2026 (PDF)</a></p>
       </div>
     </div>
