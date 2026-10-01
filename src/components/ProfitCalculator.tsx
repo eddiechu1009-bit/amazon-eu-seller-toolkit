@@ -72,7 +72,8 @@ function loadInput(): ProductInput {
         const [lo, hi] = LIMITS[k];
         if (typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi) out[k] = v;
       }
-      if (typeof saved.cat === 'string' && engine?.CAT[saved.cat]) out.cat = saved.cat;
+      // 用品類清單當白名單；不能用 CAT[...] 判斷（'constructor'、'__proto__' 也會是 truthy）
+      if (typeof saved.cat === 'string' && engine?.CATS.some(([id]) => id === saved.cat)) out.cat = saved.cat;
     }
   } catch { /* ignore */ }
   return out;
