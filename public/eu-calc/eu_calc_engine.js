@@ -211,7 +211,9 @@ function calc(i, mode){
   const errs = validate(Object.assign({}, i, {mode}));
   if(errs.length) return {mode, error: '請檢查：' + errs.join('、')};
   if(!available(mode, i.dest, i.inv)) return {mode, unavailable: mode==='efn' ? (uk ? '英國不適用 EFN（看遠程配送）' : '庫存國要選另一個歐盟國') : '要選庫存國'};
-  if(mode==='remote' && i.price > REMOTE_CAP[uk?'UK':'EU']) return {mode, unavailable: `售價超過遠程配送上限（${uk?'£122':'€135'}）`};
+  // 官方沒說上限含不含 VAT；上限是進口門檻 €150／£135（未稅）的九成 → 推定看未稅價。含稅超過、未稅沒超過的標待確認
+  const capCheck = mode==='remote' && i.price > REMOTE_CAP[uk?'UK':'EU'];
+  if(mode==='remote' && i.price/(1+i.vat/100) > REMOTE_CAP[uk?'UK':'EU'] + 1e-9) return {mode, unavailable: `未稅售價超過遠程配送上限（${uk?'£122':'€135'}）`};
   if(mode==='remote' && i.dgStorage) return {mode, unavailable:'危險品不適用遠程配送'};
   const exVat = i.price/(1+i.vat/100);
   const local = uk ? 'GBP' : 'EUR';
@@ -252,7 +254,7 @@ function calc(i, mode){
   const outs = [exVat, i.price-exVat, fulfil, ref.fee, ref.closing, storage, sub, ads, other, cost, freight, duty, fees, profit, margin, monthly, ...fulfilParts.map(p=>p[1])];
   if(!outs.every(x=> Number.isFinite(x) && Number.isFinite(x*100))) return {mode, error:'請檢查：輸入數值超出可計算範圍（售價、成本或匯率過大或過小），無法計算'};
   return {mode, price:i.price, exVat, vatAmt:i.price-exVat, cls, fulfil, fulfilParts, ref, storage, region, sub, ads, other, cost, freight, duty, profit,
-          margin, monthly, ok:true};
+          margin, monthly, capCheck, ok:true};
 }
 /* 損益兩平：利潤對售價是分段線性（佣金在門檻處跳級），逐段找最低可行售價 */
 /* 利潤是否 ≥ 0（容許浮點誤差：£20 − 8% 佣金 − £18.40 理論上剛好 0，浮點會算出 −5e-17） */
@@ -267,7 +269,7 @@ function breakEven(i, mode){
   const cand = new Set(pts);
   for(const pct of [5,7,8,9,10,12,13,15,20,45]){ cand.add((uk?0.25:0.30)/(pct/100)); cand.add(20/(pct/100)); }
   cand.add(MAXP);                                                 // 最後一段延伸到支援上限（售價 ≤ 1,000,000）
-  if(mode==='remote') cand.add(REMOTE_CAP[uk?'UK':'EU']);         // 遠程配送超過上限就不能用，上限本身是一個分段點
+  if(mode==='remote') cand.add(REMOTE_CAP[uk?'UK':'EU']*(1+i.vat/100));   // 遠程配送：未稅超過上限就不能用，換算成含稅價當分段點
   const xs = [...cand].filter(x=>x>0 && x<=MAXP).sort((a,b)=>a-b);
   // 進位到分，並回代確認真的不虧（顯示的價格要是賣得出去的價格）
   const cent = p => { let c = Math.ceil(p*100 - 1e-6)/100; for(let k=0;k<5 && (P(c)==null || P(c)<0);k++) c = Math.round(c*100+1)/100; return (P(c)!=null && P(c)>=0 && Number.isFinite(c)) ? c : null; };
