@@ -212,6 +212,7 @@ function calc(i, mode){
   if(errs.length) return {mode, error: '請檢查：' + errs.join('、')};
   if(!available(mode, i.dest, i.inv)) return {mode, unavailable: mode==='efn' ? (uk ? '英國不適用 EFN（看遠程配送）' : '庫存國要選另一個歐盟國') : '要選庫存國'};
   if(mode==='remote' && i.price > REMOTE_CAP[uk?'UK':'EU']) return {mode, unavailable: `售價超過遠程配送上限（${uk?'£122':'€135'}）`};
+  if(mode==='remote' && i.dgStorage) return {mode, unavailable:'危險品不適用遠程配送'};
   const exVat = i.price/(1+i.vat/100);
   const local = uk ? 'GBP' : 'EUR';
   const toTwd = (x, ccy)=> ccy==='TWD' ? x : ccy==='USD' ? x*i.fxUsd : ccy==='EUR' ? x*i.fxEur : x*i.fxGbp;
