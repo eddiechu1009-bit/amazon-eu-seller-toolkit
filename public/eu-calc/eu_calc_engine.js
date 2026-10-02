@@ -162,6 +162,8 @@ function shipFrom(mode, dest, inv){
   if(mode==='remote') return dest==='UK' ? inv : 'UK';
   return null;
 }
+/* 遠程配送售價上限（官方手冊 Remote Fulfilment between the UK and EU：歐盟 €135、英國 £122） */
+const REMOTE_CAP = {EU:135, UK:122};
 /* 可用性：EFN 只在歐盟站之間；遠程配送是英國↔歐盟 */
 function available(mode, dest, inv){
   if(mode==='efn') return dest!=='UK' && EU5.includes(inv) && inv!==dest;
@@ -209,6 +211,7 @@ function calc(i, mode){
   const errs = validate(Object.assign({}, i, {mode}));
   if(errs.length) return {mode, error: '請檢查：' + errs.join('、')};
   if(!available(mode, i.dest, i.inv)) return {mode, unavailable: mode==='efn' ? (uk ? '英國不適用 EFN（看遠程配送）' : '庫存國要選另一個歐盟國') : '要選庫存國'};
+  if(mode==='remote' && i.price > REMOTE_CAP[uk?'UK':'EU']) return {mode, unavailable: `售價超過遠程配送上限（${uk?'£122':'€135'}）`};
   const exVat = i.price/(1+i.vat/100);
   const local = uk ? 'GBP' : 'EUR';
   const toTwd = (x, ccy)=> ccy==='TWD' ? x : ccy==='USD' ? x*i.fxUsd : ccy==='EUR' ? x*i.fxEur : x*i.fxGbp;
@@ -263,6 +266,7 @@ function breakEven(i, mode){
   const cand = new Set(pts);
   for(const pct of [5,7,8,9,10,12,13,15,20,45]){ cand.add((uk?0.25:0.30)/(pct/100)); cand.add(20/(pct/100)); }
   cand.add(MAXP);                                                 // 最後一段延伸到支援上限（售價 ≤ 1,000,000）
+  if(mode==='remote') cand.add(REMOTE_CAP[uk?'UK':'EU']);         // 遠程配送超過上限就不能用，上限本身是一個分段點
   const xs = [...cand].filter(x=>x>0 && x<=MAXP).sort((a,b)=>a-b);
   // 進位到分，並回代確認真的不虧（顯示的價格要是賣得出去的價格）
   const cent = p => { let c = Math.ceil(p*100 - 1e-6)/100; for(let k=0;k<5 && (P(c)==null || P(c)<0);k++) c = Math.round(c*100+1)/100; return (P(c)!=null && P(c)>=0 && Number.isFinite(c)) ? c : null; };
@@ -276,5 +280,5 @@ function breakEven(i, mode){
   }
   return null;
 }
-window.EUCALC_ENGINE = {MAXP, LIMITS, FX_MIN, CATS, CAT, notLoss, VAT, SUB, FUEL_PCT, EU5, ruleText, referral, classify, lookup, storageRate, calc, breakEven, validate, available};
+window.EUCALC_ENGINE = {MAXP, REMOTE_CAP, LIMITS, FX_MIN, CATS, CAT, notLoss, VAT, SUB, FUEL_PCT, EU5, ruleText, referral, classify, lookup, storageRate, calc, breakEven, validate, available};
 })();
