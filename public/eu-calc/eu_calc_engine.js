@@ -183,6 +183,8 @@ const LIMITS = {price:[MAXP,'售價'], cost:[MAXP,'成本'], freight:[MAXP,'頭�
   l:[1000,'尺寸'], w:[1000,'尺寸'], h:[1000,'尺寸'], wt:[1e6,'重量'], units:[1e7,'月銷量'], months:[120,'在倉月數'],
   vat:[100,'VAT'], duty:[1000,'關稅'], ads:[1000,'廣告比例'], otherpct:[1000,'其他費用比例'], fuel:[100,'附加費'],
   fxEur:[1e4,'EUR 匯率'], fxGbp:[1e4,'GBP 匯率'], fxUsd:[1e4,'USD 匯率']};
+/* 匯率下限（1 外幣兌 TWD）：太小會讓成本換算成天文數字、利潤率 ×100 後溢位成無限大 */
+const FX_MIN = 0.01;
 function validate(i){
   const bad = [];
   if(!Object.hasOwn(CAT, i.cat)) bad.push('品類');                  // 白名單：擋 constructor、__proto__ 等原型鍵
@@ -197,7 +199,8 @@ function validate(i){
   ['vat','cost','freight','duty','months','sub','ads','otherpct','fuel'].forEach(k=>nonneg(k,k));
   if(i.mode==='fbm') nonneg('fbmship','FBM 運費');
   const needFx = i.ccy!==(i.dest==='UK'?'GBP':'EUR') || i.mode==='remote' || (i.dest==='UK' && i.mode!=='local');
-  if(needFx){ pos('fxEur','EUR 匯率'); pos('fxGbp','GBP 匯率'); if(i.ccy==='USD') pos('fxUsd','USD 匯率'); }
+  const fx = (k,label)=>{ pos(k,label); if(Number.isFinite(i[k]) && i[k]>0 && i[k]<FX_MIN) bad.push(label + '（至少 ' + FX_MIN + '）'); };
+  if(needFx){ fx('fxEur','EUR 匯率'); fx('fxGbp','GBP 匯率'); if(i.ccy==='USD') fx('fxUsd','USD 匯率'); }
   return [...new Set(bad)];
 }
 function calc(i, mode){
@@ -237,12 +240,13 @@ function calc(i, mode){
   const sub = i.sub/Math.max(1,i.units);
   const ads = exVat*i.ads/100, other = exVat*i.otherpct/100;
   const cost = toLocal(i.cost), freight = toLocal(i.freight), duty = (cost+freight)*i.duty/100;
+  if(![cost, freight, duty].every(Number.isFinite)) return {mode, error:'請檢查：成本或頭程換算後超出可計算範圍（匯率過小），無法計算'};
   const fees = fulfil + ref.fee + ref.closing + storage + sub + ads + other;
   const profit = exVat - fees - cost - freight - duty;
   const margin = profit/exVat, monthly = profit*i.units;
-  // 所有輸出都要是有限值（極小售價或極端匯率會讓利潤率、月利潤溢位成無限大），否則不回傳結果
+  // 所有輸出都要是有限值，且 ×100（百分比、四捨五入到分）後仍有限，否則不回傳結果
   const outs = [exVat, i.price-exVat, fulfil, ref.fee, ref.closing, storage, sub, ads, other, cost, freight, duty, fees, profit, margin, monthly, ...fulfilParts.map(p=>p[1])];
-  if(!outs.every(Number.isFinite)) return {mode, error:'請檢查：輸入數值超出可計算範圍（售價、成本或匯率過大或過小），無法計算'};
+  if(!outs.every(x=> Number.isFinite(x) && Number.isFinite(x*100))) return {mode, error:'請檢查：輸入數值超出可計算範圍（售價、成本或匯率過大或過小），無法計算'};
   return {mode, price:i.price, exVat, vatAmt:i.price-exVat, cls, fulfil, fulfilParts, ref, storage, region, sub, ads, other, cost, freight, duty, profit,
           margin, monthly, ok:true};
 }
@@ -272,5 +276,5 @@ function breakEven(i, mode){
   }
   return null;
 }
-window.EUCALC_ENGINE = {MAXP, LIMITS, CATS, CAT, notLoss, VAT, SUB, FUEL_PCT, EU5, ruleText, referral, classify, lookup, storageRate, calc, breakEven, validate, available};
+window.EUCALC_ENGINE = {MAXP, LIMITS, FX_MIN, CATS, CAT, notLoss, VAT, SUB, FUEL_PCT, EU5, ruleText, referral, classify, lookup, storageRate, calc, breakEven, validate, available};
 })();
